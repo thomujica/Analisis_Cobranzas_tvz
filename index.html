@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard de Cobranzas · TV Zamora</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{ --bg:#f6f7f9; --card:#ffffff; --ink:#111827; --ink2:#4b5563; --ink3:#9ca3af;
+    --line:#e5e7eb; --line2:#f3f4f6; --blue:#2563eb;
+    --green:#16a34a; --green-bg:#dcfce7; --red:#dc2626; --red-bg:#fee2e2;
+    --amber:#d97706; --amber-bg:#fef3c7; --radius:14px; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  button,input,select,textarea{font:inherit}
+  .layout{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+  aside{background:#0f172a;color:#cbd5e1;padding:22px 16px;position:sticky;top:0;height:100vh;overflow:auto}
+  aside .brand{color:#fff;font-size:15px;font-weight:600}
+  aside .brand-sub{font-size:11px;color:#64748b;margin-bottom:24px}
+  aside nav a{display:block;color:#94a3b8;text-decoration:none;font-size:13px;padding:8px 10px;border-radius:8px}
+  aside nav a:hover{background:#1e293b;color:#e2e8f0}
+  .cfg{margin-top:22px;font-size:11px;border-top:1px solid #1e293b;padding-top:14px}
+  .cfg label{display:block;margin:8px 0 3px;color:#94a3b8;font-size:11px}
+  .cfg input{width:100%;background:#1e293b;border:1px solid #334155;color:#e2e8f0;border-radius:6px;padding:5px 8px;font-size:12px}
+  main{padding:26px 30px;max-width:1150px}
+  h1{font-size:22px;font-weight:600}
+  .crumb{font-size:13px;color:var(--ink3);margin:2px 0 18px}
+  section{margin-bottom:34px}
+  h2{font-size:16px;font-weight:600;margin-bottom:2px}
+  .sub{font-size:13px;color:var(--ink3);margin-bottom:14px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+  .kpi .l{font-size:12px;color:var(--ink3)} .kpi .v{font-size:26px;font-weight:600;margin:4px 0 3px;font-variant-numeric:tabular-nums}
+  .chip{display:inline-block;font-size:12px;padding:1px 8px;border-radius:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .up{color:var(--green);background:var(--green-bg)} .dn{color:var(--red);background:var(--red-bg)} .ne{color:var(--ink2);background:var(--line2)} .wr{color:var(--amber);background:var(--amber-bg)}
+  table{width:100%;border-collapse:collapse;font-size:13px;background:var(--card)}
+  th{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;color:var(--ink3);text-align:right;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th:first-child{text-align:left}
+  td{padding:8px 10px;border-bottom:1px solid var(--line2);text-align:right;font-variant-numeric:tabular-nums}
+  td:first-child{text-align:left;color:var(--ink2)} td b{font-weight:600;color:var(--ink)}
+  .twrap{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .note{font-size:13px;color:var(--ink2);background:var(--line2);border-radius:10px;padding:12px 14px;margin-top:12px;line-height:1.55}
+  .note b{color:var(--ink)}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .mini .t{font-size:12px;color:var(--ink3)} .mini .n{font-size:23px;font-weight:600;font-variant-numeric:tabular-nums;margin:3px 0 2px}
+  .mini .d{font-size:12px;color:var(--ink2)}
+  ul.rec{margin:4px 0 0;padding-left:20px;font-size:14px;color:var(--ink2);line-height:1.6}
+  ul.rec li{margin-bottom:7px} ul.rec b{color:var(--ink)}
+  .legend{display:flex;gap:18px;font-size:12px;color:var(--ink3);margin-bottom:10px}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+  .bartrack{position:relative;height:12px;background:var(--line2);border-radius:4px;overflow:hidden}
+  .bar{position:absolute;top:0;bottom:0;left:0;border-radius:4px}
+  .frrow{display:grid;grid-template-columns:160px 1fr 92px;align-items:center;gap:10px;margin-bottom:10px}
+  .frrow .nm{font-size:12px;color:var(--ink2)}
+  #status{font-size:13px;color:var(--ink3);padding:8px 0}
+  .err{background:var(--red-bg);color:var(--red);border-radius:10px;padding:12px 14px;font-size:13px;margin-top:10px;line-height:1.6}
+  .warnb{background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:12px 14px;font-size:13px;margin-top:10px;line-height:1.6}
+  footer{font-size:11px;color:var(--ink3);margin-top:20px;padding-top:14px;border-top:1px solid var(--line)}
+  code{background:var(--line2);padding:1px 5px;border-radius:5px;font-size:12px}
+  .loader{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .loader input[type=file]{font-size:13px}
+  .btn{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 18px;cursor:pointer;font-size:14px}
+  .btn:disabled{opacity:.5;cursor:wait}
+  @media(max-width:980px){.layout{grid-template-columns:1fr}aside{position:static;height:auto}.kpis,.grid3{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside>
+  <div class="brand">TV Zamora, C.A.</div>
+  <div class="brand-sub">Dashboard de Cobranzas y Facturación</div>
+  <nav>
+    <a href="#resumen">Resumen ejecutivo</a>
+    <a href="#sucursales">Sucursales</a>
+    <a href="#pagos">Formas de pago</a>
+    <a href="#bt">BT Tesoro</a>
+    <a href="#costos">Costo por canal</a>
+    <a href="#diario">Recaudación diaria</a>
+    <a href="#bancos">Bancos</a>
+    <a href="#divide">Comportamiento de pago</a>
+    <a href="#alertas">Alertas</a>
+    <a href="#recs">Recomendaciones</a>
+  </nav>
+  <div class="cfg">
+    <div style="color:#e2e8f0;font-weight:600;margin-bottom:4px">Comisiones</div>
+    <label>BT Tesoro (%)</label><input id="cfgBt" type="number" step="0.1" value="2.0">
+    <label>Tarjeta crédito (%)</label><input id="cfgTc" type="number" step="0.1" value="2.5">
+    <label>Débito (%)</label><input id="cfgTd" type="number" step="0.1" value="1.0">
+    <label style="margin-top:10px;color:#64748b">Pago móvil, transferencia y efectivo: 0%</label>
+    <div id="bankComms" style="margin-top:12px"></div>
+  </div>
+</aside>
+
+<main>
+  <h1>Resumen de cobranza comparado</h1>
+  <div class="crumb" id="subtitle">Carga los dos reportes de cobranza (PDF) para generar el comparativo</div>
+
+  <div class="card" id="loaderCard">
+    <div style="font-size:14px;font-weight:600;margin-bottom:4px">📄 Cargar reportes</div>
+    <div style="font-size:13px;color:var(--ink2);margin-bottom:12px">
+      Selecciona primero el reporte del <b>mes anterior</b> y luego el del <b>mes más reciente</b>. Acepta PDF (resumen) o Excel .xlsx (detalle) — con el Excel verás además bancos y comportamiento de pago.
+      Los PDF se procesan en tu dispositivo; nada se sube a internet (salvo la librería pdf.js la primera vez).
+    </div>
+    <div class="loader">
+      <input type="file" id="fA">
+      <input type="file" id="fS">
+      <button class="btn" id="btnLoad">Generar dashboard</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div style="height:22px"></div>
+
+  <section id="resumen">
+    <h2>Indicadores clave</h2>
+    <p class="sub">Variación del mes más reciente contra el mes anterior. Las comisiones se ajustan en la barra lateral.</p>
+    <div class="kpis" id="kpiCards"></div>
+  </section>
+
+  <section id="sucursales">
+    <h2>Sucursales — recaudación por franquicia</h2>
+    <p class="sub">USD cobrados por oficina de cada franquicia (cajas físicas + canal virtual + BT Tesoro).</p>
+    <div class="card"><div class="legend" id="frLegend"></div><div id="chartFran"></div></div>
+    <div class="twrap" style="margin-top:12px"><table id="tblFran"></table></div>
+  </section>
+
+  <section id="pagos">
+    <h2>Formas de pago</h2>
+    <p class="sub">Monto, participación en el mix y variación. En tarjeta de crédito, bajar es bueno: son comisiones que se ahorran.</p>
+    <div class="twrap"><table id="tblFp"></table></div>
+    <div class="note" id="fpNote"></div>
+  </section>
+
+  <section id="bt">
+    <h2>BT Tesoro — adopción y rentabilidad</h2>
+    <p class="sub">Comisión configurada: <b id="btPct">2,0%</b> por transacción. El análisis se recalcula al cambiarla.</p>
+    <div class="grid3" id="btCards"></div>
+    <div class="note" id="btNote"></div>
+  </section>
+
+  <section id="costos">
+    <h2>Costo estimado por canal de recaudación</h2>
+    <p class="sub">Costo de cada forma de pago en el mes más reciente, según las comisiones configuradas.</p>
+    <div class="twrap"><table id="tblCosto"></table></div>
+    <div class="note">Ajusta las comisiones reales de tus contratos con bancos/procesadores en la barra lateral. Estrategia: <b>maximizar canales de costo cero</b> (pago móvil, transferencia) y negociar o descontinuar los caros.</div>
+  </section>
+
+  <section id="diario">
+    <h2>Recaudación diaria</h2>
+    <p class="sub">Patrón día a día: picos de facturación al inicio de mes y quincenas flojas.</p>
+    <div class="card"><div class="legend" id="diLegend"></div><div id="chartDiario"></div></div>
+  </section>
+
+
+  <section id="bancos" style="display:none">
+    <h2>Bancos — ranking y matriz banco × método</h2>
+    <p class="sub">Disponible con el Excel de detalle. Comisiones por banco configurables en la barra lateral.</p>
+    <div class="twrap"><table id="tblBancos"></table></div>
+    <div class="twrap" style="margin-top:12px;overflow-x:auto"><table id="tblBankMat" style="font-size:12px"></table></div>
+    <div class="note" id="bankNote"></div>
+  </section>
+
+  <section id="divide" style="display:none">
+    <h2>Comportamiento de pago — ¿todo al inicio o divide?</h2>
+    <p class="sub">Clientes que pagan su mensualidad completa en un solo pago vs. los que la dividen en cuotas. (Requiere el Excel del mes completo para ver el patrón real.)</p>
+    <div class="kpis" id="divCards" style="grid-template-columns:repeat(4,1fr)"></div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="twrap"><table id="tblSplit"></table></div>
+      <div class="card" id="splitNote" style="font-size:13px;color:var(--ink2);line-height:1.6"></div>
+    </div>
+  </section>
+
+  <section id="alertas">
+    <h2>Alertas y observaciones</h2>
+    <p class="sub">Señales detectadas automáticamente al cruzar ambos reportes.</p>
+    <div class="twrap"><table id="tblAlertas"></table></div>
+  </section>
+
+  <section id="recs">
+    <h2>Recomendaciones</h2>
+    <ul class="rec" id="recsList"></ul>
+  </section>
+
+  <footer>Dashboard local: los PDF se procesan en tu navegador con pdf.js · Comisiones editables en la barra lateral · Bloque "Bancos" listo para conectar con la API de movimientos.</footer>
+</main>
+</div>
+
+<script>
+/* ============================================================
+   DASHBOARD DINÁMICO — cargas los 2 PDF cada mes y comparas.
+   Funciona con doble clic (seleccionando archivos) o con
+   servidor local leyendo la carpeta data/ (ver README).
+   ============================================================ */
+const AUTO_FILES = ['data/anterior.pdf', 'data/actual.pdf'];
+let IS_EXCEL = false; // solo si hay servidor
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ---------- utilidades ---------- */
+function parseNum(s){
+  s = String(s).replace(/[\s\u00a0]/g,'');
+  if(!s) return 0;
+  const li=s.lastIndexOf('.'), lj=s.lastIndexOf(',');
+  if(li>-1 && lj>-1){ s = li>lj ? s.replace(/,/g,'') : s.replace(/\./g,'').replace(',','.'); }
+  else if(lj>-1){ s = (s.length-1-lj===2) ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,''); }
+  else if(s.indexOf('.')!==s.lastIndexOf('.')){ s=s.replace(/\./g,''); }
+  const n=parseFloat(s); return isNaN(n)?0:n;
+}
+const hasNum = x => /\d/.test(x) && !/[A-Za-zñÑ]/.test(x);
+const norm = ln => ln.replace(/[|\s]/g,'').toUpperCase();
+const fmt  = n => '$ ' + Math.round(n).toLocaleString('es-VE');
+const fmt1 = n => n.toLocaleString('es-VE',{minimumFractionDigits:1,maximumFractionDigits:1});
+const pct  = (a,b) => a>0 ? (b-a)/a*100 : null;
+function chipDelta(a,b, invert){
+  const d = pct(a,b);
+  if(d===null) return '<span class="chip ne">nuevo</span>';
+  const good = invert ? d<0 : d>=0;
+  return `<span class="chip ${good?'up':'dn'}">${d>=0?'▲':'▼'} ${Math.abs(d).toFixed(1)}%</span>`;
+}
+
+/* ---------- extracción de texto (reconstruye palabras por posición X) ---------- */
+async function extractLines(buf){
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  const lines = [];
+  for(let p=1;p<=pdf.numPages;p++){
+    const tc = await (await pdf.getPage(p)).getTextContent();
+    const items = tc.items
+      .filter(it => it.str && it.str.trim())
+      .map(it => ({ x: it.transform[4], y: it.transform[5],
+                    w: it.width || it.str.length*((it.height||8)*0.5),
+                    t: it.str.trim() }));
+    // agrupar en líneas por Y (tolerancia 3)
+    const rows = [];
+    for(const it of items){
+      let r = null;
+      for(const rr of rows){ if(Math.abs(rr.y-it.y)<=3){ r=rr; break; } }
+      if(!r){ r = {y:it.y, items:[]}; rows.push(r); }
+      r.items.push(it);
+    }
+    rows.sort((a,b)=>b.y-a.y);   // de arriba hacia abajo
+    for(const r of rows){
+      r.items.sort((a,b)=>a.x-b.x);
+      // reconstruir palabras: unir items con separación pequeña en X
+      const words = []; let cur = null;
+      for(const it of r.items){
+        if(cur && (it.x-(cur.x+cur.w)) <= 2.0){
+          cur.t += it.t; cur.w = Math.max(cur.w, it.x+it.w-cur.x);
+        } else { if(cur) words.push(cur.t); cur = {x:it.x, w:it.w, t:it.t}; }
+      }
+      if(cur) words.push(cur.t);
+      lines.push(words.join('|'));
+    }
+  }
+  return lines;
+}
+
+/* ---------- parsers (validados contra los reportes reales) ---------- */
+function parseFormaPago(lines){
+  const out=[]; let igtf=0, totalUsd=0, on=false;
+  for(const ln of lines){
+    const n = norm(ln);
+    if(n.includes('RESUMENPORFORMADEPAGO')){ on=true; continue; }
+    if(!on) continue;
+    if(n.includes('TOTALFORMAPAGO')){
+      const nums = ln.split('|').filter(hasNum).map(parseNum);
+      if(nums.length>1) totalUsd = nums[1];
+      igtf = nums.length>3 ? nums[3] : 0; break;
+    }
+    const cells = ln.split('|');
+    const idx = cells.findIndex(x => /^\d{1,6}$/.test(x));
+    if(idx>0 && cells.length>idx+1 && !norm(cells.slice(0,idx).join(' ')).includes('DESCRIPCION')){
+      out.push({ nombre: cells.slice(0,idx).join(' '), cant: parseNum(cells[idx]), usd: parseNum(cells[idx+1]) });
+    }
+  }
+  return { rows: out, igtf, totalUsd };
+}
+
+const FR_KEYS = [
+  ['PUERTOORDAZEMPRESARIAL','P.O. EMPRESARIAL'],['PUERTOORDAZ','PUERTO ORDAZ'],
+  ['SANTABARBARA','SANTA BÁRBARA'],['SANTAELENA','SANTA ELENA'],['SANFELIX','SAN FÉLIX'],
+  ['CAICARA','CAICARA DEL ORINOCO'],['GUASIPATI','GUASIPATI'],['MATURIN','MATURÍN'],
+  ['SOLEDAD','SOLEDAD'],['TUMEREMO','TUMEREMO'],['UPATA','UPATA'],['BOLIVAR','BOLÍVAR'],
+  ['CHACAO','CHACAO'],['CORE8','CORE 8'],['ELTRIUNFO','EL TRIUNFO'],['TVZAMORA','TVZ ESPECIAL *']
+];
+function parseFranquicias(lines){
+  const agg = {}; let zone = false;
+  for(const ln of lines){
+    const n = norm(ln);
+    if(n.includes('RESUMENPOROFICINADECOBRO')){ zone=true; continue; }
+    if(zone && n.includes('RESUMENPORCOBRADOR')) break;
+    if(!zone) continue;
+    if(!/^(OFC|OFICINA|OFIVIRTUAL)/i.test(ln.split('|')[0])) continue;
+    const cells = ln.split('|');
+    const nums = cells.map((x,i)=>({i,v:parseNum(x)})).filter(o=>hasNum(cells[o.i]));
+    if(nums.length<3) continue;
+    const usd = nums[nums.length-2].v;
+    for(const [k,name] of FR_KEYS){ if(n.includes(k)){ agg[name]=(agg[name]||0)+usd; break; } }
+  }
+  return agg;
+}
+function parseDiario(lines){
+  const out=[]; let zone=false;
+  for(const ln of lines){
+    if(norm(ln).includes('RESUMENDIARIO')){ zone=true; continue; }
+    if(!zone) continue;
+    if(/^(\d{2}\/\d{2}\/\d{4})\|/.test(ln)){
+      const c=ln.split('|'); out.push({ dia:+c[0].substr(0,2), cant:parseNum(c[1]), usd:parseNum(c[2]) });
+    }
+  }
+  return out;
+}
+function parseSimple(lines, key){
+  for(const ln of lines){
+    if(norm(ln).includes(key)){
+      const nums = ln.split('|').filter(hasNum).map(parseNum);
+      if(nums.length>=2) return { cant:nums[0], usd:nums[1] };
+    }
+  }
+  return { cant:0, usd:0 };
+}
+function parseCargosMes(lines){
+  const rows=[]; let zone=false;
+  for(const ln of lines){
+    const n = norm(ln);
+    if(n.includes('RESUMENDECARGOSCOBRADOSPORMESES')){ zone=true; continue; }
+    if(!zone) continue;
+    if(n.includes('TOTALCOBRANZAPORMESES')) break;
+    const cells = ln.split('|').map(s=>s.trim());
+    for(let i=0;i<cells.length;i++){
+      let mes = null;
+      const m = cells[i].match(/^([A-ZÁÉÍÓÚÑ.]+) ?(20\d\d)$/);
+      if(m) mes = m[1]+' '+m[2];
+      else if(/^[A-ZÁÉÍÓÚÑ.]+$/.test(cells[i]) && i+1<cells.length && /^20\d\d$/.test(cells[i+1]))
+        mes = cells[i]+' '+cells[i+1];
+      if(mes){
+        const nums = cells.slice(i+1).filter(hasNum).map(parseNum);
+        if(nums.length>=2) rows.push({ mes, usd:nums[1] });
+        break;
+      }
+    }
+  }
+  return rows;
+}
+function groupFp(rows){
+  const g={pm:0,td:0,tc:0,tr:0,ef:0,bio:0,dep:0,ret:0,bt:0}, c={pm:0,td:0,tc:0,tr:0,ef:0,bio:0,dep:0,ret:0,bt:0};
+  for(const r of rows){
+    const n = norm(r.nombre); const u=r.usd, q=r.cant;
+    if(n.includes('PAGOMOVIL')){ g.pm+=u; c.pm+=q; }
+    else if(n.includes('MASTER')||n.includes('DEBITO')){ g.td+=u; c.td+=q; }
+    else if(n.includes('CREDITO')){ g.tc+=u; c.tc+=q; }
+    else if(n.includes('TRANSFERENCIA')){ g.tr+=u; c.tr+=q; }
+    else if(n.includes('EFECTIVO')){ g.ef+=u; c.ef+=q; }
+    else if(n.includes('BIOPAGO')){ g.bio+=u; c.bio+=q; }
+    else if(n.includes('DEPOSITO')){ g.dep+=u; c.dep+=q; }
+    else if(n.includes('RETENCION')){ g.ret+=u; c.ret+=q; }
+    else if(n.includes('TESORO')){ g.bt+=u; c.bt+=q; }
+  }
+  return { usd:g, cant:c };
+}
+
+/* ---------- render ---------- */
+function render(A, S, names, com){
+  const totA=A.fp.totalUsd, totS=S.fp.totalUsd;
+  const trA=A.fp.rows.reduce((s,r)=>s+r.cant,0), trS=S.fp.rows.reduce((s,r)=>s+r.cant,0);
+  const tickA=totA/trA, tickS=totS/trS;
+  const gA=groupFp(A.fp.rows), gS=groupFp(S.fp.rows);
+
+  document.getElementById('subtitle').innerHTML =
+    `Comparando <b>${names[0]}</b> vs <b>${names[1]}</b> · procesado localmente en tu dispositivo`;
+
+  // validación de integridad de la lectura
+  const sumS = S.fp.rows.reduce((s,r)=>s+r.usd,0);
+  if(totS>0 && Math.abs(sumS-totS)/totS > 0.01){
+    const st=document.getElementById('status');
+    st.innerHTML = `<div class="warnb">⚠️ Lectura parcial del PDF de ${names[1]}: las formas de pago suman ${fmt(sumS)} vs total reportado ${fmt(totS)}. Revisa que el PDF esté completo; algunas filas pueden faltar en sucursales.</div>`;
+  }
+
+  const mesCorrA = A.cargos.length?Math.max(...A.cargos.map(r=>r.usd)):0;
+  const mesCorrS = S.cargos.length?Math.max(...S.cargos.map(r=>r.usd)):0;
+  document.getElementById('kpiCards').innerHTML = `
+    <div class="card kpi"><div class="l">Total recaudado</div><div class="v">${fmt(totS)}</div>${chipDelta(totA,totS)}</div>
+    <div class="card kpi"><div class="l">Transacciones</div><div class="v">${trS.toLocaleString('es-VE')}</div>${chipDelta(trA,trS)}</div>
+    <div class="card kpi"><div class="l">Ticket promedio</div><div class="v">${fmt1(tickS)}</div>${chipDelta(tickA,tickS,true)}</div>
+    <div class="card kpi"><div class="l">Cobro del mes corrido</div><div class="v">${fmt(mesCorrS)}</div>${mesCorrA?chipDelta(mesCorrA,mesCorrS):'<span class="chip ne">n/d</span>'}</div>`;
+
+  const namesF = [...new Set([...Object.keys(A.fran), ...Object.keys(S.fran)])];
+  const FR = namesF.map(k=>[k, A.fran[k]||0, S.fran[k]||0]).sort((a,b)=>b[2]-a[2]);
+  const top8 = FR.slice(0,8);
+  const mx = Math.max(...top8.map(r=>Math.max(r[1],r[2])), 1);
+  document.getElementById('frLegend').innerHTML =
+    `<span><span class="dot" style="background:var(--blue);opacity:.45"></span>${names[0]}</span>
+     <span><span class="dot" style="background:var(--blue)"></span>${names[1]}</span>`;
+  document.getElementById('chartFran').innerHTML = top8.map(r=>`
+    <div class="frrow"><div class="nm">${r[0]}</div>
+      <div><div class="bartrack"><div class="bar" style="width:${r[1]/mx*100}%;background:var(--blue);opacity:.45"></div></div>
+      <div class="bartrack" style="margin-top:3px"><div class="bar" style="width:${r[2]/mx*100}%;background:var(--blue)"></div></div></div>
+      <div style="text-align:right">${chipDelta(r[1],r[2])}</div></div>`).join('');
+  document.getElementById('tblFran').innerHTML =
+    `<tr><th>Franquicia</th><th>${names[0]}</th><th>${names[1]}</th><th>Variación</th><th style="text-align:left">Δ %</th></tr>` +
+    FR.map(r=>`<tr><td>${r[0]}</td><td>${fmt(r[1])}</td><td><b>${fmt(r[2])}</b></td>
+      <td>${r[2]>=r[1]?'+':'−'}${Math.round(Math.abs(r[2]-r[1])).toLocaleString('es-VE')}</td>
+      <td style="text-align:left">${chipDelta(r[1],r[2])}</td></tr>`).join('');
+
+  const FP=[['Pago móvil','pm'],['Débito (TD+TDV+MasterDebit)','td'],['Transferencia','tr'],
+    ['Efectivo (Bs+USD)','ef'],['Tarjeta de crédito','tc'],['Biopago','bio'],
+    ['Retención','ret'],['BT Tesoro','bt'],['Depósito','dep']];
+  const maxMix = Math.max(...FP.map(f=>gS.usd[f[1]]/totS*100), 1);
+  const fpRow = f => { const a=gA.usd[f[1]], s=gS.usd[f[1]], mix=s/totS*100;
+    return `<tr><td>${f[0]}</td><td>${gA.cant[f[1]].toLocaleString('es-VE')}</td><td><b>${gS.cant[f[1]].toLocaleString('es-VE')}</b></td>
+      <td>${fmt(a)}</td><td><b>${fmt(s)}</b></td>
+      <td style="width:26%;min-width:150px"><div style="display:flex;align-items:center;gap:8px">
+        <div class="bartrack" style="flex:1"><div class="bar" style="width:${mix/maxMix*100}%;background:var(--blue)"></div></div>
+        <span style="font-size:12px;color:var(--ink2);width:44px;text-align:right">${mix.toFixed(1)}%</span></div></td>
+      <td>${chipDelta(a,s, f[1]==='tc')}</td></tr>`; };
+  const totCantA = Object.values(gA.cant).reduce((s,x)=>s+x,0), totCantS = Object.values(gS.cant).reduce((s,x)=>s+x,0);
+  document.getElementById('tblFp').innerHTML =
+    `<tr><th>Forma de pago</th><th>Trans ${names[0]}</th><th>Trans ${names[1]}</th><th>${names[0]}</th><th>${names[1]}</th><th style="text-align:left">Mix ${names[1]}</th><th>Δ monto</th></tr>` +
+    FP.map(fpRow).join('') +
+    `<tr style="background:var(--line2)"><td><b>TOTAL</b></td><td><b>${totCantA.toLocaleString('es-VE')}</b></td><td><b>${totCantS.toLocaleString('es-VE')}</b></td>
+      <td><b>${fmt(totA)}</b></td><td><b>${fmt(totS)}</b></td><td></td><td>${chipDelta(totA,totS)}</td></tr>`;
+  const cero = gS.usd.pm+gS.usd.tr+gS.usd.ef;
+  document.getElementById('fpNote').innerHTML =
+    `<b>Lectura del mix:</b> el pago móvil concentra <b>${(gS.usd.pm/totS*100).toFixed(1)}%</b> del dinero. `+
+    `Canales sin comisión (pago móvil + transferencia + efectivo) suman <b>${fmt(cero)} (${(cero/totS*100).toFixed(1)}%)</b>. `+
+    `La caída de tarjeta de crédito es <b>ahorro de comisiones</b>, no pérdida de negocio.`;
+
+  const btA=gA.usd.bt, btS=gS.usd.bt, btCA=gA.cant.bt, btCS=gS.cant.bt;
+  const cBt = btS*com.bt, cBtA = btA*com.bt;
+  document.getElementById('btPct').textContent = (com.bt*100).toFixed(1).replace('.',',')+'%';
+  document.getElementById('btCards').innerHTML = `
+    <div class="card mini"><div class="t">Transacciones</div><div class="n">${btCA} → ${btCS}</div><div class="d">${chipDelta(btCA,btCS)}</div></div>
+    <div class="card mini"><div class="t">Monto recaudado</div><div class="n">${fmt(btS)}</div><div class="d">${chipDelta(btA,btS)}</div></div>
+    <div class="card mini"><div class="t">Comisión pagada (mes)</div><div class="n">${fmt(cBt)}</div><div class="d">${btCS?('~'+fmt1(cBt/btCS)+' por operación'):'—'}</div></div>`;
+  document.getElementById('btNote').innerHTML =
+    `Con el <b>${(com.bt*100).toFixed(1)}%</b> de comisión, este canal le costó <b>${fmt(cBt)}</b> en ${names[1]} (vs ${fmt(cBtA)} en ${names[0]}) por recaudar solo `+
+    `<b>${(btS/totS*100).toFixed(2)}%</b> del total, sin crecimiento entre meses (${btCA} → ${btCS} operaciones). `+
+    `Cada $100 que entran por BT Tesoro dejan <b>${fmt1(com.bt*100)}</b> en comisión; por pago móvil dejan <b>0</b>. `+
+    `Veredicto: canal <b>caro en proporción y estancado</b>. Opciones: (1) negociar la tasa a la baja, (2) migrar esos usuarios a pago móvil con un incentivo, `+
+    `(3) mantenerlo solo si atiende clientes sin banca digital — en ese caso, trátalo como costo de inclusión y no de recaudación.`;
+
+  const canales=[
+    ['Pago móvil', gS.usd.pm, 0],['Transferencia', gS.usd.tr, 0],['Efectivo', gS.usd.ef, 0],
+    ['Depósito', gS.usd.dep, 0],['Retención', gS.usd.ret, 0],['Débito', gS.usd.td, com.td],
+    ['Tarjeta crédito', gS.usd.tc, com.tc],['Biopago', gS.usd.bio, 0.005],['BT Tesoro', gS.usd.bt, com.bt]
+  ];
+  const rows = canales.map(c=>({ n:c[0], m:c[1], r:c[2], cost:c[1]*c[2] })).sort((a,b)=>a.r-b.r);
+  const totCost = rows.reduce((s,r)=>s+r.cost,0), totRec = rows.reduce((s,r)=>s+r.m,0);
+  document.getElementById('tblCosto').innerHTML =
+    `<tr><th>Canal</th><th>Recaudado</th><th>Comisión</th><th>Costo estimado</th><th>Costo / $100</th><th style="text-align:left">Eficiencia</th></tr>` +
+    rows.map(r=>{
+      const eff = r.r===0 ? '<span class="chip up">óptimo</span>' : (r.r>=0.02?'<span class="chip dn">caro</span>':'<span class="chip wr">moderado</span>');
+      return `<tr><td>${r.n}</td><td>${fmt(r.m)}</td><td>${(r.r*100).toFixed(2)}%</td><td><b>${fmt(r.cost)}</b></td>
+        <td>${fmt1(r.r*100)}</td><td style="text-align:left">${eff}</td></tr>`; }).join('') +
+    `<tr><td><b>TOTAL</b></td><td><b>${fmt(totRec)}</b></td><td></td><td><b>${fmt(totCost)}</b></td>
+      <td>${fmt1(totCost/totRec*100)}</td><td></td></tr>`;
+
+  const dA=A.diario, dS=S.diario;
+  const maxD = Math.max(...dA.map(d=>d.usd), ...dS.map(d=>d.usd), 1);
+  const W=760, H=210, PAD=34;
+  const x = i => PAD + i*(W-PAD-12)/30;
+  const y = v => H-24 - (v/maxD)*(H-48);
+  const path = arr => arr.map((d,i)=>(i?'L':'M')+x(d.dia-1).toFixed(1)+','+y(d.usd).toFixed(1)).join(' ');
+  let grid='';
+  for(let g=0;g<=4;g++){ const gy=y(maxD*g/4);
+    grid+=`<line x1="${PAD}" y1="${gy}" x2="${W-12}" y2="${gy}" stroke="#e5e7eb"/>
+           <text x="${PAD-6}" y="${gy+4}" text-anchor="end" font-size="10" fill="#9ca3af">${Math.round(maxD*g/4/1000)}k</text>`; }
+  document.getElementById('diLegend').innerHTML =
+    `<span><span class="dot" style="background:var(--blue);opacity:.45"></span>${names[0]}</span>
+     <span><span class="dot" style="background:var(--blue)"></span>${names[1]}</span>`;
+  document.getElementById('chartDiario').innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" style="width:100%;display:block">${grid}
+      <path d="${path(dA)}" fill="none" stroke="var(--blue)" stroke-width="2" opacity="0.45"/>
+      <path d="${path(dS)}" fill="none" stroke="var(--blue)" stroke-width="2.5"/>
+      ${dS.map(d=>`<circle cx="${x(d.dia-1)}" cy="${y(d.usd)}" r="2.5" fill="var(--blue)"/>`).join('')}</svg>
+     <div style="font-size:11px;color:var(--ink3);display:flex;justify-content:space-between;padding:0 ${PAD}px">
+       <span>día 1</span><span>día 10</span><span>día 20</span><span>día 30/31</span></div>`;
+
+  const ncA=A.nc.usd, ncS=S.nc.usd, anuA=A.anul.usd, anuS=S.anul.usd;
+  const tvz = S.fran['TVZ ESPECIAL *']||0;
+  const sube = FR.filter(r=>r[1]>0 && (r[2]/r[1]-1)>0.05);
+  const baja = FR.filter(r=>r[1]>1000 && (r[2]/r[1]-1)<-0.02);
+  document.getElementById('tblAlertas').innerHTML =
+    `<tr><th style="text-align:left">Señal</th><th>${names[0]}</th><th>${names[1]}</th><th style="text-align:left">Lectura</th></tr>
+     <tr><td>Notas de crédito</td><td>${fmt(ncA)}</td><td><b>${fmt(ncS)}</b></td>
+       <td style="text-align:left"><span class="chip ${ncS/totS>0.25?'dn':'up'}">${(ncS/totS*100).toFixed(1)}% de la cobranza</span></td></tr>
+     <tr><td>Anulaciones</td><td>${fmt(anuA)}</td><td>${fmt(anuS)}</td><td style="text-align:left">${chipDelta(anuA,anuS,true)}</td></tr>
+     <tr><td>IGTF cobrado</td><td>${fmt(A.fp.igtf)}</td><td>${fmt(S.fp.igtf)}</td><td style="text-align:left">${chipDelta(A.fp.igtf,S.fp.igtf)}</td></tr>
+     <tr><td>Sucursales en ascenso (&gt;5%)</td><td colspan="2"><b>${sube.map(r=>`${r[0]} +${(r[2]/r[1]*100-100).toFixed(1)}%`).join(' · ')||'—'}</b></td>
+       <td style="text-align:left"><span class="chip up">replicar práctica</span></td></tr>
+     <tr><td>Sucursales en caída (&gt;2%)</td><td colspan="2"><b>${baja.map(r=>`${r[0]} ${(r[2]/r[1]*100-100).toFixed(1)}%`).join(' · ')||'—'}</b></td>
+       <td style="text-align:left"><span class="chip dn">investigar</span></td></tr>
+     <tr><td>TV Zamora Especial (no declarante)</td><td>${fmt(A.fran['TVZ ESPECIAL *']||0)}</td><td>${fmt(tvz)}</td>
+       <td style="text-align:left"><span class="chip wr">fuera de base imponible</span></td></tr>`;
+
+  const topS = FR[0]||['—',0,0];
+  document.getElementById('recsList').innerHTML = `
+    <li><b>BT Tesoro cuesta ${fmt(cBt)}/mes</b> de comisión por ${fmt(btS)} recaudados (${(btS/totS*100).toFixed(2)}% del mix, sin crecimiento). Negocia la tasa o migra esos clientes a pago móvil.</li>
+    <li><b>La baja de tarjeta de crédito es ahorro:</b> cada dólar que migra de crédito (${(com.tc*100).toFixed(1)}% de comisión) a un canal cero libera comisión sin perder recaudación — el total del mes incluso creció.</li>
+    <li><b>Protege a ${topS[0]}</b> (${fmt(topS[2])}, ${(topS[2]/totS*100).toFixed(1)}% de la recaudación) y replica en las sucursales en caída lo que hicieron las que crecen.</li>
+    <li><b>Audita las notas de crédito:</b> ${fmt(ncS)} equivalen al ${(ncS/totS*100).toFixed(1)}% de lo cobrado. Revisa motivos: errores de facturación, reconexiones indebidas o descuentos mal aplicados.</li>
+    <li><b>Metas sugeridas para el próximo mes:</b> canales de costo cero por encima del 70% del mix, notas de crédito bajo el 25% de la cobranza y cobro del mes corrido sobre el 80%.</li>`;
+}
+
+/* ---------- carga y arranque ---------- */
+function setStatus(html, isErr){
+  const st = document.getElementById('status');
+  st.innerHTML = html ? (isErr ? `<div class="err">${html}</div>` : `<div class="note">${html}</div>`) : '';
+}
+function getCom(){ return {
+  bt: parseFloat(document.getElementById('cfgBt').value||'0')/100,
+  tc: parseFloat(document.getElementById('cfgTc').value||'0')/100,
+  td: parseFloat(document.getElementById('cfgTd').value||'0')/100 }; }
+
+async function parseReport(buf){
+  const lines = await extractLines(buf);
+  return { fp:parseFormaPago(lines), fran:parseFranquicias(lines), diario:parseDiario(lines),
+           nc:parseSimple(lines,'SOLICITADAS'), anul:parseSimple(lines,'ANULADODEFECHAS'),
+           cargos:parseCargosMes(lines) };
+}
+function draw(A,S,names){
+  try{
+    render(A,S,names,getCom());
+    document.getElementById('loaderCard').scrollIntoView({behavior:'smooth'});
+  }catch(err){
+    setStatus('<b>Error al dibujar:</b> ' + (err && err.message ? err.message : err), true);
+  }
+}
+async function run(fA, fS, names){
+  const btn = document.getElementById('btnLoad');
+  btn.disabled = true; btn.textContent = 'Procesando…';
+  setStatus(IS_EXCEL ? 'Leyendo Excel… con archivos grandes (40MB) puede tardar hasta 1 minuto, no cierres la página.' : 'Leyendo PDF… esto tarda unos segundos.');
+  try{
+    const [bA, bS] = await Promise.all([fA, fS]);   // esperar los ArrayBuffer primero
+    const parseOne = b => IS_EXCEL ? parseReportExcel(b) : parseReport(b);
+    const [A,S] = await Promise.all([parseOne(bA), parseOne(bS)]);
+    if(!A.fp.totalUsd || !S.fp.totalUsd)
+      throw new Error('No pude leer los totales. Verifica que sean los reportes correctos (PDF resumen o Excel de detalle).');
+    setStatus('');
+    const redraw = () => { try{
+      render(A,S,names,getCom());
+      renderExtra(A,S,names,getCom());
+    }catch(e){ setStatus('Error: '+e.message, true);} };
+    window.__redraw = redraw;
+    redraw();
+    ['cfgBt','cfgTc','cfgTd'].forEach(id => document.getElementById(id).addEventListener('input', redraw));
+  }catch(e){
+    setStatus('<b>No se pudieron procesar los archivos.</b><br>' + (e && e.message ? e.message : e), true);
+  }
+  btn.disabled = false; btn.textContent = 'Generar dashboard';
+}
+
+document.getElementById('btnLoad').onclick = () => {
+  const a = document.getElementById('fA').files[0], s = document.getElementById('fS').files[0];
+  if(!a || !s){ setStatus('Selecciona los dos archivos PDF: primero el mes anterior, luego el mes más reciente.', true); return; }
+  const okExt = f => /\.(pdf|xlsx|xls)$/i.test(f.name);
+  if(!okExt(a) || !okExt(s)){
+    setStatus('<b>Archivo no soportado.</b> Los reportes deben estar en formato <b>PDF</b> (resumen) o <b>Excel (.xlsx)</b> (detalle). Si tu archivo es .xls antiguo, ábrelo en Excel y guárdalo como .xlsx.', true);
+    return;
+  }
+  IS_EXCEL = /\.xlsx?$/i.test(a.name);
+  run(a.arrayBuffer(), s.arrayBuffer(), [a.name.replace(/\.(pdf|xlsx|xls)$/i,''), s.name.replace(/\.(pdf|xlsx|xls)$/i,'')]);
+};
+
+
+/* ================= EXCEL DETALLE: bancos + divisiones de pago ================= */
+function num(x){
+  if(typeof x === 'number') return x;
+  let s = String(x==null?'':x).replace(/[\s$]/g,'');
+  if(!s) return 0;
+  const li=s.lastIndexOf('.'), lj=s.lastIndexOf(',');
+  if(li>-1 && lj>-1){ s = li>lj ? s.replace(/,/g,'') : s.replace(/\./g,'').replace(',','.'); }
+  else if(lj>-1){ s = (s.length-1-lj===2) ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,''); }
+  else if(s.indexOf('.')!==s.lastIndexOf('.')){ s=s.replace(/\./g,''); }
+  const n = parseFloat(s); return isNaN(n)?0:n;
+}
+function cleanBank(b){
+  if(!b || !String(b).trim()) return 'EFECTIVO / SIN BANCO';
+  const u = String(b).trim().toUpperCase();
+  const MAP = [
+    [/VENEZUELA/,'Banco de Venezuela'],[/BICENTENARIO/,'Banco Bicentenario'],[/TESORO/,'Banco del Tesoro'],
+    [/MERCANTIL/,'Banco Mercantil'],[/PROVINCIAL/,'Provincial'],[/CARON/,'Caroní'],[/ACTIVO/,'Banco Activo'],
+    [/BANPLUS/,'Banplus'],[/BANESCO/,'Banesco'],[/AMIGA/,'Banca Amiga'],[/NACIONAL/,'Nacional de Crédito'],
+    [/FANB/,'Banfanb'],[/DEL ?SUR/,'Banco del Sur'],[/100%/,'100% Banco'],[/SOFITASA/,'Sofitasa'],
+    [/^BNC$/,'BNC'],[/RET\./,'RETENCIONES'],[/RETENC/,'RETENCIONES'],[/CASHEA/,'Cashea'],
+    [/BANCARIBE/,'Bancaribe'],[/DELTA/,'Banco Delta'],[/EXTERIOR/,'Banco Exterior'],
+    [/FONDO COMUN/,'Fondo Común'],[/PLAZA/,'Banco Plaza'],[/AGRICOLA/,'Banco Agrícola'],[/BFC/,'BFC']
+  ];
+  for(const [re,name] of MAP){ if(re.test(u)) return name; }
+  return u.charAt(0)+u.slice(1).toLowerCase();
+}
+async function parseReportExcel(buf){
+  const head = new Uint8Array(buf.slice(0,4));
+  const sig = Array.from(head).map(b=>b.toString(16).padStart(2,'0')).join(' ');
+  if(sig.startsWith('50 4b')){ /* xlsx real (ZIP) */ }
+  else if(sig.startsWith('d0 cf 11 e0')){
+    throw new Error('Este archivo es Excel VIEJO (.xls interno). Ábrelo en Excel y guárdalo como ".xlsx" (Libro de Excel), luego vuelve a cargarlo.');
+  } else {
+    throw new Error('Este archivo NO es un Excel .xlsx válido (parece HTML u otro formato renombrado). En tu sistema de cobranza, exporta el detalle como Excel .xlsx real.');
+  }
+  const wb = XLSX.read(buf, {type:'array'});
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:''});
+  const data = rows.filter(r => String(r['ID Contrato']) !== 'ID Contrato');
+  const fpRows = {};
+  const seen = {}, pagos = [];
+  const banks = {}, bankMat = {};
+  let igtf = 0;
+  for(const r of data){
+    const fp = String(r['Forma de Pago']||'').trim().toUpperCase();
+    const mf = num(r['Total Forma Pago']);
+    if(fp){
+      fpRows[fp] = fpRows[fp] || {nombre:fp, cant:0, usd:0};
+      fpRows[fp].cant++; fpRows[fp].usd += mf;
+    }
+    igtf += num(r['IGTF']);
+    const b = cleanBank(r['Banco']);
+    banks[b] = banks[b] || {usd:0, cant:0};
+    banks[b].usd += mf; banks[b].cant++;
+    if(fp){ bankMat[b] = bankMat[b]||{}; bankMat[b][fp] = (bankMat[b][fp]||0)+mf; }
+    const id = String(r['ID Pago']);
+    if(!seen[id]){
+      seen[id] = true;
+      pagos.push({fran:String(r['Franquicia Cobro']||'').trim().toUpperCase(), usd:num(r['Total Pago']),
+        abonado:String(r['N° Abonado']), fecha:String(r['Fecha'])});
+    }
+  }
+  const fran = {}, diaMap = {};
+  for(const p of pagos){ fran[p.fran]=(fran[p.fran]||0)+p.usd; const d=+p.fecha.substr(0,2); diaMap[d]=(diaMap[d]||0)+p.usd; }
+  const diario = Object.keys(diaMap).map(d=>({dia:+d, usd:diaMap[d]})).sort((a,b)=>a.dia-b.dia);
+  const byAbo = {};
+  for(const p of pagos){ (byAbo[p.abonado]=byAbo[p.abonado]||[]).push(p); }
+  let n1=0,n2=0,n3=0; const patterns={}; const d1a=[],d2a=[];
+  for(const k in byAbo){
+    const arr = byAbo[k].sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    if(arr.length===1) n1++;
+    else if(arr.length===2){ n2++;
+      const t=arr[0].usd+arr[1].usd;
+      const pat = Math.round(arr[0].usd/t*100)+'% / '+Math.round(arr[1].usd/t*100)+'%';
+      patterns[pat]=(patterns[pat]||0)+1;
+      d1a.push(+arr[0].fecha.substr(0,2)); d2a.push(+arr[1].fecha.substr(0,2));
+    } else n3++;
+  }
+  const med = a => a.length? a.sort((x,y)=>x-y)[Math.floor(a.length/2)] : 0;
+  return { fp:{rows:Object.values(fpRows), igtf, totalUsd: pagos.reduce((s,p)=>s+p.usd,0)},
+    fran, diario, nc:{cant:0,usd:0}, anul:{cant:0,usd:0}, cargos:[],
+    banks, bankMat,
+    splits:{ n1,n2,n3,total:Object.keys(byAbo).length, patterns, d1:med(d1a), d2:med(d2a) } };
+}
+
+/* ---------- secciones extra ---------- */
+window._bankRates = window._bankRates || {};
+function renderExtra(A, S, names, com){
+  const hasBanks = S.banks && Object.keys(S.banks).length;
+  document.getElementById('bancos').style.display = hasBanks ? '' : 'none';
+  document.getElementById('divide').style.display = (S.splits && S.splits.total) ? '' : 'none';
+  if(hasBanks) renderBanks(A,S,names);
+  if(S.splits && S.splits.total) renderDivide(S);
+}
+function renderBanks(A,S,names){
+  const all = [...new Set([...Object.keys(A.banks||{}), ...Object.keys(S.banks)])]
+    .filter(b => b !== 'RETENCIONES');
+  const totS = Object.values(S.banks).reduce((s,b)=>s+b.usd,0);
+  // inputs de comisión por banco (una sola vez)
+  const cont = document.getElementById('bankComms');
+  if(!cont.dataset.ready){
+    cont.innerHTML = '<div style="color:#e2e8f0;font-weight:600;margin:10px 0 4px;font-size:11px">Comisión por banco (%)</div>';
+    all.forEach(b=>{
+      const lab = document.createElement('label'); lab.textContent = b; lab.style.fontSize='10px';
+      const inp = document.createElement('input'); inp.type='number'; inp.step='0.1'; inp.value='0'; inp.min='0';
+      inp.dataset.bank = b; inp.title = 'Comisión % por transacción de '+b;
+      inp.addEventListener('input', ()=>{ window._bankRates[b]=parseFloat(inp.value||'0')/100; if(window.__redraw) window.__redraw(); });
+      cont.appendChild(lab); cont.appendChild(inp);
+    });
+    cont.dataset.ready = '1';
+  }
+  const rows = all.map(b=>{
+    const a=(A.banks&&A.banks[b])||{usd:0,cant:0}, s=S.banks[b]||{usd:0,cant:0};
+    const rate = window._bankRates[b]||0;
+    return {b, a, s, rate, mix:s.usd/totS*100, cost:s.usd*rate};
+  }).sort((x,y)=>y.s.usd-x.s.usd);
+  document.getElementById('tblBancos').innerHTML =
+    `<tr><th>Banco</th><th>Trans ${names[1]}</th><th>${names[0]}</th><th>${names[1]}</th><th>Mix</th><th>Ticket</th><th>Comisión</th><th>Costo ${names[1]}</th><th>Δ</th></tr>` +
+    rows.map(r=>`<tr><td>${r.b}</td><td>${r.s.cant.toLocaleString('es-VE')}</td><td>${fmt(r.a.usd)}</td><td><b>${fmt(r.s.usd)}</b></td>
+      <td>${r.mix.toFixed(1)}%</td><td>${fmt1(r.s.cant? r.s.usd/r.s.cant : 0)}</td>
+      <td style="color:var(--ink2)">${(r.rate*100).toFixed(1)}%</td>
+      <td><b>${fmt(r.cost)}</b></td><td>${chipDelta(r.a.usd, r.s.usd)}</td></tr>`).join('') +
+    `<tr style="background:var(--line2)"><td><b>TOTAL</b></td><td><b>${rows.reduce((s,r)=>s+r.s.cant,0).toLocaleString('es-VE')}</b></td>
+      <td><b>${fmt(rows.reduce((s,r)=>s+r.a.usd,0))}</b></td><td><b>${fmt(totS)}</b></td><td></td><td></td><td></td>
+      <td><b>${fmt(rows.reduce((s,r)=>s+r.cost,0))}</b></td><td></td></tr>`;
+  // matriz banco x metodo (mes S)
+  const methods = {};
+  for(const b in S.bankMat) for(const m in S.bankMat[b]) methods[m]=(methods[m]||0)+S.bankMat[b][m];
+  const mCols = Object.keys(methods).sort((a,b)=>methods[b]-methods[a]).slice(0,10);
+  const topBanks = rows.slice(0,14);
+  document.getElementById('tblBankMat').innerHTML =
+    `<tr><th>Banco \\ Método</th>${mCols.map(m=>`<th style="text-align:right">${m}</th>`).join('')}<th>TOTAL</th></tr>` +
+    topBanks.map(r=>{
+      const bm = S.bankMat[r.b]||{};
+      return `<tr><td>${r.b}</td>${mCols.map(m=>`<td>${bm[m]? fmt(bm[m]) : '<span style="color:var(--ink3)">—</span>'}</td>`).join('')}<td><b>${fmt(r.s.usd)}</b></td></tr>`;
+    }).join('');
+  // nota ejecutiva
+  const top1 = rows[0], top3 = rows.slice(0,3).reduce((s,r)=>s+r.s.usd,0);
+  const btA=(A.banks&&A.banks['Banco del Tesoro'])? A.banks['Banco del Tesoro'].usd : 0;
+  const btS=S.banks['Banco del Tesoro']? S.banks['Banco del Tesoro'].usd : 0;
+  document.getElementById('bankNote').innerHTML =
+    `<b>Lectura:</b> ${top1.b} concentra <b>${top1.mix.toFixed(1)}%</b> de la recaudación y el top 3 <b>${(top3/totS*100).toFixed(1)}%</b> — ` +
+    `alta concentración: prioridad de negociación de comisiones en ${top1.b}. ` +
+    (btS? `Banco del Tesoro (botón + tarjetas) en ${names[1]}: <b>${fmt(btS)}</b> ${btA?`(${chipDelta(btA,btS)})`:''}. `:'') +
+    `Las comisiones por banco se configuran en la barra lateral y el costo se recalcula en vivo.`;
+}
+function renderDivide(S){
+  const sp = S.splits, tot = sp.total;
+  const pct1=(sp.n1/tot*100), pct2=(sp.n2/tot*100), pct3=(sp.n3/tot*100);
+  document.getElementById('divCards').innerHTML = `
+    <div class="card kpi"><div class="l">Clientes únicos</div><div class="v">${tot.toLocaleString('es-VE')}</div><span class="chip ne">base del mes</span></div>
+    <div class="card kpi"><div class="l">Pagan todo en 1 pago</div><div class="v">${pct1.toFixed(1)}%</div><div class="d">${sp.n1.toLocaleString('es-VE')} clientes</div></div>
+    <div class="card kpi"><div class="l">Dividen en 2 pagos</div><div class="v">${pct2.toFixed(1)}%</div><div class="d">${sp.n2.toLocaleString('es-VE')} clientes · 1er pago día ${sp.d1||'—'}, 2do día ${sp.d2||'—'}</div></div>
+    <div class="card kpi"><div class="l">Dividen en 3+ pagos</div><div class="v">${pct3.toFixed(1)}%</div><div class="d">${sp.n3.toLocaleString('es-VE')} clientes</div></div>`;
+  const pats = Object.entries(sp.patterns).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  document.getElementById('tblSplit').innerHTML =
+    `<tr><th style="text-align:left">Patrón de división (cuota 1 / cuota 2)</th><th>Clientes</th></tr>` +
+    (pats.length ? pats.map(([p,c])=>`<tr><td>${p}</td><td><b>${c}</b></td></tr>`).join('')
+      : '<tr><td colspan="2">Sin clientes que dividan en esta data (o el mes está incompleto)</td></tr>');
+  document.getElementById('splitNote').innerHTML =
+    `<b>¿Cómo leer esto?</b> El ${pct1.toFixed(1)}% de los clientes paga su mensualidad completa de una sola vez. ` +
+    `Quienes dividen, típicamente pagan la primera parte entre los días <b>${sp.d1||'—'}</b> y la segunda entre los días <b>${sp.d2||'—'}</b> del mes. ` +
+    `Con el Excel del <b>mes completo</b> el patrón es exacto (en quincenas cortadas las segundas cuotas aún no llegan). ` +
+    `Los patrones 99%/1% o 100%/0% suelen ser abonos simbólicos o pagos separados el mismo día.`;
+}
+
+/* Carga automática desde data/ solo si hay servidor local */
+if(location.protocol.startsWith('http')){
+  (async () => {
+    try{
+      const bufs = await Promise.all(AUTO_FILES.map(u => fetch(u).then(r => { if(!r.ok) throw 0; return r.arrayBuffer(); })));
+      const names = AUTO_FILES.map(u => u.split('/').pop().replace('.pdf',''));
+      setStatus('Reportes cargados automáticamente desde <code>data/</code>. También puedes usar los selectores de arriba para comparar otros meses.');
+      const [A,S] = await Promise.all(bufs.map(parseReport));
+      if(A.fp.totalUsd && S.fp.totalUsd){
+        const redraw = () => { try{ render(A,S,names,getCom()); }catch(e){} };
+        redraw();
+        ['cfgBt','cfgTc','cfgTd'].forEach(id => document.getElementById(id).addEventListener('input', redraw));
+      }
+    }catch(e){ /* sin servidor o sin archivos: se usa la carga manual */ }
+  })();
+}
+</script>
+</body>
+</html>
