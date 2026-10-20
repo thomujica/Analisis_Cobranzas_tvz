@@ -84,11 +84,14 @@
   </nav>
   <div class="cfg">
     <div style="color:#e2e8f0;font-weight:600;margin-bottom:4px">Comisiones</div>
-    <label>BT Tesoro (%)</label><input id="cfgBt" type="number" step="0.1" value="2.0">
-    <label>Tarjeta crédito (%)</label><input id="cfgTc" type="number" step="0.1" value="2.5">
-    <label>Débito (%)</label><input id="cfgTd" type="number" step="0.1" value="1.0">
-    <label style="margin-top:10px;color:#64748b">Pago móvil, transferencia y efectivo: 0%</label>
-    <div id="bankComms" style="margin-top:12px"></div>
+    <div style="font-size:10px;color:#94a3b8;line-height:1.7;margin-top:6px">
+      Pago móvil recibido: <b style="color:#e2e8f0">1,50%</b><br>
+      Transferencias: 0,10–1,50% según cuenta<br>
+      Débito POS: 0,25–2,00% según banco<br>
+      Crédito: 1,52–4,80% según banco<br>
+      BT Tesoro (botón): <b style="color:#e2e8f0">2,00%</b><br>
+      BNC POS: 2 terminales × $137,16/mes fijo
+    </div>
   </div>
 </aside>
 
@@ -143,7 +146,7 @@
     <h2>Costo estimado por canal de recaudación</h2>
     <p class="sub">Costo de cada forma de pago en el mes más reciente, según las comisiones configuradas.</p>
     <div class="twrap"><table id="tblCosto"></table></div>
-    <div class="note">Ajusta las comisiones reales de tus contratos con bancos/procesadores en la barra lateral. Estrategia: <b>maximizar canales de costo cero</b> (pago móvil, transferencia) y negociar o descontinuar los caros.</div>
+    <div class="note">Comisiones según tu tabla oct-2026 (constantes en el código). Estrategia: <b>maximizar canales baratos</b> (débito Fondo Común/BFC/Banesco 0,25–0,28%) frente a caros (crédito hasta 4,80%, BDV POS 2%).</div>
   </section>
 
   <section id="diario">
@@ -182,7 +185,7 @@
     <ul class="rec" id="recsList"></ul>
   </section>
 
-  <footer><span style="background:var(--amber-bg);color:var(--amber);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600">v2026-10-20 · banco=CUENTA RECEPTORA · efectivo separado Bs/USD</span><br><br>Dashboard local: los PDF se procesan en tu navegador con pdf.js · Comisiones editables en la barra lateral · Bloque "Bancos" listo para conectar con la API de movimientos.</footer>
+  <footer><span style="background:var(--amber-bg);color:var(--amber);padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600">v2026-10-20c · efectivo USD fix + comisiones constantes · efectivo separado Bs/USD</span><br><br>Dashboard local: los PDF se procesan en tu navegador con pdf.js · Comisiones editables en la barra lateral · Bloque "Bancos" listo para conectar con la API de movimientos.</footer>
 </main>
 </div>
 
@@ -192,6 +195,26 @@
    Funciona con doble clic (seleccionando archivos) o con
    servidor local leyendo la carpeta data/ (ver README).
    ============================================================ */
+
+/* === COMISIONES POR BANCO × MÉTODO — constantes según tabla de comisiones oct-2026 ===
+   Pago móvil recibido 1,50% | Transferencias según cuenta | POS según tabla */
+const COMISIONES = {
+  'Banco de Venezuela': { 'PAGO MOVIL':0.015, 'TRANSFERENCIA':0.001, 'TARJETA DE DEBITO':0.02, 'TARJETA DE CREDITO':0.0152, 'BIOPAGO':0.02 },
+  'Banesco':            { 'PAGO MOVIL':0.015, 'TRANSFERENCIA':0.003, 'TARJETA DE DEBITO':0.0028, 'TARJETA DE CREDITO':0.0431 },
+  'Fondo Común':        { 'PAGO MOVIL':0.015, 'TRANSFERENCIA':0.004, 'TARJETA DE DEBITO':0.0025, 'TARJETA DE CREDITO':0.048 },
+  'BFC':                { 'TARJETA DEBITO V':0.0025, 'TARJETA DE DEBITO':0.0025 },
+  'BNC':                { 'TRANSFERENCIA':0.003, 'TARJETA DE CREDITO':0 },
+  'Banca Amiga':        { 'PAGO MOVIL':0.015, 'TRANSFERENCIA':0.003 },
+  'Banplus':            { 'PAGO MOVIL':0.015, 'TRANSFERENCIA':0.015 },
+  'Banco Mercantil':    { 'PAGO MOVIL':0.015, 'TRANSFERENCIA':0.003 },
+  'Banco Activo':       { 'PAGO MOVIL':0.015, 'TRANSFERENCIA':0.003 },
+  'Banco del Tesoro':   { 'TRANSFERENCIA':0.003 },
+  'Provincial':         { 'TRANSFERENCIA':0.003, 'TARJETA DE DEBITO':0.02 }
+};
+const CARGOS_FIJOS = [ { nombre:'BNC — 2 terminales POS (cargo mensual fijo)', monto: 274.32 } ];
+const BT_TESORO_RATE = 0.02;  // botón BT Tesoro: 2% por transacción
+function rate(banco, metodo){ return (COMISIONES[banco]||{})[metodo] || 0; }
+
 const AUTO_FILES = ['data/anterior.pdf', 'data/actual.pdf'];
 let IS_EXCEL = false; // solo si hay servidor
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -342,19 +365,20 @@ function parseCargosMes(lines){
   return rows;
 }
 function groupFp(rows){
-  const g={pm:0,td:0,tc:0,tr:0,efbs:0,efusd:0,bio:0,dep:0,ret:0,bt:0}, c={pm:0,td:0,tc:0,tr:0,efbs:0,efusd:0,bio:0,dep:0,ret:0,bt:0};
+  const g={pm:0,td:0,tc:0,tr:0,efbs:0,efusd:0,bio:0,dep:0,ret:0,bt:0,otros:0}, c={pm:0,td:0,tc:0,tr:0,efbs:0,efusd:0,bio:0,dep:0,ret:0,bt:0,otros:0};
   for(const r of rows){
     const n = norm(r.nombre); const u=r.usd, q=r.cant;
     if(n.includes('PAGOMOVIL')){ g.pm+=u; c.pm+=q; }
     else if(n.includes('MASTER')||n.includes('DEBITO')){ g.td+=u; c.td+=q; }
     else if(n.includes('CREDITO')){ g.tc+=u; c.tc+=q; }
     else if(n.includes('TRANSFERENCIA')){ g.tr+=u; c.tr+=q; }
-    else if(n.includes('EFECTIVO DOLAR')||n.includes('EFECTIVO DOLARES')){ g.efusd+=u; c.efusd+=q; }
+    else if(n.includes('EFECTIVODOLAR')){ g.efusd+=u; c.efusd+=q; }
     else if(n.includes('EFECTIVO')){ g.efbs+=u; c.efbs+=q; }
     else if(n.includes('BIOPAGO')){ g.bio+=u; c.bio+=q; }
     else if(n.includes('DEPOSITO')){ g.dep+=u; c.dep+=q; }
     else if(n.includes('RETENCION')){ g.ret+=u; c.ret+=q; }
     else if(n.includes('TESORO')){ g.bt+=u; c.bt+=q; }
+    else { g.otros+=u; c.otros+=q; }
   }
   return { usd:g, cant:c };
 }
@@ -417,6 +441,7 @@ function render(A, S, names, com){
   document.getElementById('tblFp').innerHTML =
     `<tr><th>Forma de pago</th><th>Trans ${names[0]}</th><th>Trans ${names[1]}</th><th>${names[0]}</th><th>${names[1]}</th><th style="text-align:left">Mix ${names[1]}</th><th>Δ monto</th></tr>` +
     FP.map(fpRow).join('') +
+    (gS.usd.otros>0 ? fpRow(['Otros (cashea, etc.)','otros']) : '') +
     `<tr style="background:var(--line2)"><td><b>TOTAL</b></td><td><b>${totCantA.toLocaleString('es-VE')}</b></td><td><b>${totCantS.toLocaleString('es-VE')}</b></td>
       <td><b>${fmt(totA)}</b></td><td><b>${fmt(totS)}</b></td><td></td><td>${chipDelta(totA,totS)}</td></tr>`;
   const cero = gS.usd.pm+gS.usd.tr+gS.usd.efbs+gS.usd.efusd;
@@ -439,21 +464,36 @@ function render(A, S, names, com){
     `Veredicto: canal <b>caro en proporción y estancado</b>. Opciones: (1) negociar la tasa a la baja, (2) migrar esos usuarios a pago móvil con un incentivo, `+
     `(3) mantenerlo solo si atiende clientes sin banca digital — en ese caso, trátalo como costo de inclusión y no de recaudación.`;
 
-  const canales=[
-    ['Pago móvil', gS.usd.pm, 0],['Transferencia', gS.usd.tr, 0],['Efectivo Bs', gS.usd.efbs, 0],['Efectivo USD', gS.usd.efusd, 0],
-    ['Depósito', gS.usd.dep, 0],['Retención', gS.usd.ret, 0],['Débito', gS.usd.td, com.td],
-    ['Tarjeta crédito', gS.usd.tc, com.tc],['Biopago', gS.usd.bio, 0.005],['BT Tesoro', gS.usd.bt, com.bt]
-  ];
-  const rows = canales.map(c=>({ n:c[0], m:c[1], r:c[2], cost:c[1]*c[2] })).sort((a,b)=>a.r-b.r);
-  const totCost = rows.reduce((s,r)=>s+r.cost,0), totRec = rows.reduce((s,r)=>s+r.m,0);
+  // costo real por método: suma banco×método con COMISIONES constantes
+  const METS = [ ['PAGO MOVIL','Pago móvil'], ['TRANSFERENCIA','Transferencia'], ['TARJETA DE DEBITO','Tarjeta débito'],
+    ['TARJETA DEBITO V','Tarjeta débito V'], ['MASTER DEBIT','MasterDebit'], ['TARJETA DE CREDITO','Tarjeta crédito'],
+    ['BIOPAGO','Biopago'], ['BT TESORO','BT Tesoro (botón)'] ];
+  let rowsC = [], totCost = 0, totRec = 0;
+  if(S.bankMat){
+    for(const [m,label] of METS){
+      let vol=0, cost=0;
+      for(const b in S.bankMat){ const v=S.bankMat[b][m]||0; vol+=v; cost+=v*rate(b,m); }
+      if(m==='BT TESORO' && vol>0) cost += vol*BT_TESORO_RATE;
+      if(vol>0){ rowsC.push({n:label, m:vol, cost, r:vol?cost/vol:0}); totCost+=cost; totRec+=vol; }
+    }
+  } else {
+    rowsC = [
+      ['Pago móvil', gS.usd.pm, 0.015],['Transferencia', gS.usd.tr, 0.003],
+      ['Efectivo Bs', gS.usd.efbs, 0],['Efectivo USD', gS.usd.efusd, 0],
+      ['Depósito', gS.usd.dep, 0],['Retención', gS.usd.ret, 0],['Débito', gS.usd.td, 0.01],
+      ['Tarjeta crédito', gS.usd.tc, 0.0431],['Biopago', gS.usd.bio, 0],['BT Tesoro', gS.usd.bt, 0.02]
+    ].map(r=>({n:r[0], m:r[1], cost:r[1]*r[2], r:r[2]}));
+    totCost = rowsC.reduce((s,r)=>s+r.cost,0); totRec = rowsC.reduce((s,r)=>s+r.m,0);
+  }
+  for(const cf of CARGOS_FIJOS){ rowsC.push({n:cf.nombre, m:0, cost:cf.monto, r:0, flat:true}); totCost+=cf.monto; }
   document.getElementById('tblCosto').innerHTML =
-    `<tr><th>Canal</th><th>Recaudado</th><th>Comisión</th><th>Costo estimado</th><th>Costo / $100</th><th style="text-align:left">Eficiencia</th></tr>` +
-    rows.map(r=>{
-      const eff = r.r===0 ? '<span class="chip up">óptimo</span>' : (r.r>=0.02?'<span class="chip dn">caro</span>':'<span class="chip wr">moderado</span>');
-      return `<tr><td>${r.n}</td><td>${fmt(r.m)}</td><td>${(r.r*100).toFixed(2)}%</td><td><b>${fmt(r.cost)}</b></td>
+    `<tr><th>Canal</th><th>Volumen</th><th>Comisión efectiva</th><th>Costo estimado</th><th>Costo / $100</th><th style="text-align:left">Eficiencia</th></tr>` +
+    rowsC.sort((a,b)=>a.r-b.r).map(r=>{
+      const eff = r.flat ? '<span class="chip wr">fijo mensual</span>' : (r.r===0 ? '<span class="chip up">óptimo</span>' : (r.r>=0.02?'<span class="chip dn">caro</span>':'<span class="chip wr">moderado</span>'));
+      return `<tr><td>${r.n}</td><td>${r.m?fmt(r.m):'—'}</td><td>${(r.r*100).toFixed(2)}%</td><td><b>${fmt(r.cost)}</b></td>
         <td>${fmt1(r.r*100)}</td><td style="text-align:left">${eff}</td></tr>`; }).join('') +
     `<tr><td><b>TOTAL</b></td><td><b>${fmt(totRec)}</b></td><td></td><td><b>${fmt(totCost)}</b></td>
-      <td>${fmt1(totCost/totRec*100)}</td><td></td></tr>`;
+      <td>${totRec?fmt1(totCost/totRec*100):'0,0'}</td><td></td></tr>`;
 
   const dA=A.diario, dS=S.diario;
   const maxD = Math.max(...dA.map(d=>d.usd), ...dS.map(d=>d.usd), 1);
@@ -507,10 +547,7 @@ function setStatus(html, isErr){
   const st = document.getElementById('status');
   st.innerHTML = html ? (isErr ? `<div class="err">${html}</div>` : `<div class="note">${html}</div>`) : '';
 }
-function getCom(){ return {
-  bt: parseFloat(document.getElementById('cfgBt').value||'0')/100,
-  tc: parseFloat(document.getElementById('cfgTc').value||'0')/100,
-  td: parseFloat(document.getElementById('cfgTd').value||'0')/100 }; }
+function getCom(){ return { bt: BT_TESORO_RATE, tc: 0.0431, td: 0.01 }; }
 
 async function parseReport(buf){
   const lines = await extractLines(buf);
@@ -543,7 +580,6 @@ async function run(fA, fS, names){
     }catch(e){ setStatus('Error: '+e.message, true);} };
     window.__redraw = redraw;
     redraw();
-    ['cfgBt','cfgTc','cfgTd'].forEach(id => document.getElementById(id).addEventListener('input', redraw));
   }catch(e){
     setStatus('<b>No se pudieron procesar los archivos.</b><br>' + (e && e.message ? e.message : e), true);
   }
@@ -623,7 +659,11 @@ async function parseReportExcel(buf){
       fpRows[fp].cant++; fpRows[fp].usd += mf;
     }
     igtf += num(r['IGTF']);
-    const b = cleanBank(r['Cuenta Bancaria'] || r['Banco']);
+    const cb = String(r['Cuenta Bancaria']||'').trim();
+    let b;
+    if(cb) b = cleanBank(cb);                                    // SOLO cuenta receptora
+    else if(fp.includes('RETENC')) b = 'RETENCIONES';
+    else b = 'SIN CUENTA / OTROS';                               // efectivo, biopago, master debit...
     banks[b] = banks[b] || {usd:0, cant:0};
     banks[b].usd += mf; banks[b].cant++;
     if(fp){ bankMat[b] = bankMat[b]||{}; bankMat[b][fp] = (bankMat[b][fp]||0)+mf; }
@@ -658,7 +698,6 @@ async function parseReportExcel(buf){
 }
 
 /* ---------- secciones extra ---------- */
-window._bankRates = window._bankRates || {};
 function renderExtra(A, S, names, com){
   const hasBanks = S.banks && Object.keys(S.banks).length;
   document.getElementById('bancos').style.display = hasBanks ? '' : 'none';
@@ -670,29 +709,20 @@ function renderBanks(A,S,names){
   const all = [...new Set([...Object.keys(A.banks||{}), ...Object.keys(S.banks)])]
     .filter(b => b !== 'RETENCIONES');
   const totS = Object.values(S.banks).reduce((s,b)=>s+b.usd,0);
-  // inputs de comisión por banco (una sola vez)
-  const cont = document.getElementById('bankComms');
-  if(!cont.dataset.ready){
-    cont.innerHTML = '<div style="color:#e2e8f0;font-weight:600;margin:10px 0 4px;font-size:11px">Comisión por banco (%)</div>';
-    all.forEach(b=>{
-      const lab = document.createElement('label'); lab.textContent = b; lab.style.fontSize='10px';
-      const inp = document.createElement('input'); inp.type='number'; inp.step='0.1'; inp.value='0'; inp.min='0';
-      inp.dataset.bank = b; inp.title = 'Comisión % por transacción de '+b;
-      inp.addEventListener('input', ()=>{ window._bankRates[b]=parseFloat(inp.value||'0')/100; if(window.__redraw) window.__redraw(); });
-      cont.appendChild(lab); cont.appendChild(inp);
-    });
-    cont.dataset.ready = '1';
-  }
   const rows = all.map(b=>{
     const a=(A.banks&&A.banks[b])||{usd:0,cant:0}, s=S.banks[b]||{usd:0,cant:0};
-    const rate = window._bankRates[b]||0;
-    return {b, a, s, rate, mix:s.usd/totS*100, cost:s.usd*rate};
+    const bm = (S.bankMat&&S.bankMat[b])||{};
+    let cost = 0;
+    for(const m in bm) cost += bm[m]*rate(b,m);
+    if(b==='BNC' && (bm['TARJETA DE DEBITO']||bm['TARJETA DE CREDITO']||bm['TARJETA DEBITO V'])) cost += 274.32;
+    const effRate = s.usd>0 ? cost/s.usd : 0;
+    return {b, a, s, mix:s.usd/totS*100, cost, effRate};
   }).sort((x,y)=>y.s.usd-x.s.usd);
   document.getElementById('tblBancos').innerHTML =
     `<tr><th>Banco</th><th>Trans ${names[1]}</th><th>${names[0]}</th><th>${names[1]}</th><th>Mix</th><th>Ticket</th><th>Comisión</th><th>Costo ${names[1]}</th><th>Δ</th></tr>` +
     rows.map(r=>`<tr><td>${r.b}</td><td>${r.s.cant.toLocaleString('es-VE')}</td><td>${fmt(r.a.usd)}</td><td><b>${fmt(r.s.usd)}</b></td>
       <td>${r.mix.toFixed(1)}%</td><td>${fmt1(r.s.cant? r.s.usd/r.s.cant : 0)}</td>
-      <td style="color:var(--ink2)">${(r.rate*100).toFixed(1)}%</td>
+      <td style="color:var(--ink2)">${(r.effRate*100).toFixed(2)}%</td>
       <td><b>${fmt(r.cost)}</b></td><td>${chipDelta(r.a.usd, r.s.usd)}</td></tr>`).join('') +
     `<tr style="background:var(--line2)"><td><b>TOTAL</b></td><td><b>${rows.reduce((s,r)=>s+r.s.cant,0).toLocaleString('es-VE')}</b></td>
       <td><b>${fmt(rows.reduce((s,r)=>s+r.a.usd,0))}</b></td><td><b>${fmt(totS)}</b></td><td></td><td></td><td></td>
@@ -716,7 +746,7 @@ function renderBanks(A,S,names){
     `<b>Lectura:</b> Banco según tu <b>cuenta receptora</b> (columna Cuenta Bancaria). ${top1.b} concentra <b>${top1.mix.toFixed(1)}%</b> de la recaudación y el top 3 <b>${(top3/totS*100).toFixed(1)}%</b> — ` +
     `alta concentración: prioridad de negociación de comisiones en ${top1.b}. ` +
     (btS? `Banco del Tesoro (botón + tarjetas) en ${names[1]}: <b>${fmt(btS)}</b> ${btA?`(${chipDelta(btA,btS)})`:''}. `:'') +
-    `Las comisiones por banco se configuran en la barra lateral y el costo se recalcula en vivo.`;
+    `Comisiones según tu tabla oct-2026, aplicadas banco×método. Costo recalculado en vivo.`;
 }
 function renderDivide(S){
   const sp = S.splits, tot = sp.total;
@@ -749,8 +779,7 @@ if(location.protocol.startsWith('http')){
       if(A.fp.totalUsd && S.fp.totalUsd){
         const redraw = () => { try{ render(A,S,names,getCom()); }catch(e){} };
         redraw();
-        ['cfgBt','cfgTc','cfgTd'].forEach(id => document.getElementById(id).addEventListener('input', redraw));
-      }
+          }
     }catch(e){ /* sin servidor o sin archivos: se usa la carga manual */ }
   })();
 }
