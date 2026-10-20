@@ -342,14 +342,15 @@ function parseCargosMes(lines){
   return rows;
 }
 function groupFp(rows){
-  const g={pm:0,td:0,tc:0,tr:0,ef:0,bio:0,dep:0,ret:0,bt:0}, c={pm:0,td:0,tc:0,tr:0,ef:0,bio:0,dep:0,ret:0,bt:0};
+  const g={pm:0,td:0,tc:0,tr:0,efbs:0,efusd:0,bio:0,dep:0,ret:0,bt:0}, c={pm:0,td:0,tc:0,tr:0,efbs:0,efusd:0,bio:0,dep:0,ret:0,bt:0};
   for(const r of rows){
     const n = norm(r.nombre); const u=r.usd, q=r.cant;
     if(n.includes('PAGOMOVIL')){ g.pm+=u; c.pm+=q; }
     else if(n.includes('MASTER')||n.includes('DEBITO')){ g.td+=u; c.td+=q; }
     else if(n.includes('CREDITO')){ g.tc+=u; c.tc+=q; }
     else if(n.includes('TRANSFERENCIA')){ g.tr+=u; c.tr+=q; }
-    else if(n.includes('EFECTIVO')){ g.ef+=u; c.ef+=q; }
+    else if(n.includes('EFECTIVO DOLAR')||n.includes('EFECTIVO DOLARES')){ g.efusd+=u; c.efusd+=q; }
+    else if(n.includes('EFECTIVO')){ g.efbs+=u; c.efbs+=q; }
     else if(n.includes('BIOPAGO')){ g.bio+=u; c.bio+=q; }
     else if(n.includes('DEPOSITO')){ g.dep+=u; c.dep+=q; }
     else if(n.includes('RETENCION')){ g.ret+=u; c.ret+=q; }
@@ -402,7 +403,7 @@ function render(A, S, names, com){
       <td style="text-align:left">${chipDelta(r[1],r[2])}</td></tr>`).join('');
 
   const FP=[['Pago móvil','pm'],['Débito (TD+TDV+MasterDebit)','td'],['Transferencia','tr'],
-    ['Efectivo (Bs+USD)','ef'],['Tarjeta de crédito','tc'],['Biopago','bio'],
+    ['Efectivo Bs','efbs'],['Efectivo USD','efusd'],['Tarjeta de crédito','tc'],['Biopago','bio'],
     ['Retención','ret'],['BT Tesoro','bt'],['Depósito','dep']];
   const maxMix = Math.max(...FP.map(f=>gS.usd[f[1]]/totS*100), 1);
   const fpRow = f => { const a=gA.usd[f[1]], s=gS.usd[f[1]], mix=s/totS*100;
@@ -418,7 +419,7 @@ function render(A, S, names, com){
     FP.map(fpRow).join('') +
     `<tr style="background:var(--line2)"><td><b>TOTAL</b></td><td><b>${totCantA.toLocaleString('es-VE')}</b></td><td><b>${totCantS.toLocaleString('es-VE')}</b></td>
       <td><b>${fmt(totA)}</b></td><td><b>${fmt(totS)}</b></td><td></td><td>${chipDelta(totA,totS)}</td></tr>`;
-  const cero = gS.usd.pm+gS.usd.tr+gS.usd.ef;
+  const cero = gS.usd.pm+gS.usd.tr+gS.usd.efbs+gS.usd.efusd;
   document.getElementById('fpNote').innerHTML =
     `<b>Lectura del mix:</b> el pago móvil concentra <b>${(gS.usd.pm/totS*100).toFixed(1)}%</b> del dinero. `+
     `Canales sin comisión (pago móvil + transferencia + efectivo) suman <b>${fmt(cero)} (${(cero/totS*100).toFixed(1)}%)</b>. `+
@@ -439,7 +440,7 @@ function render(A, S, names, com){
     `(3) mantenerlo solo si atiende clientes sin banca digital — en ese caso, trátalo como costo de inclusión y no de recaudación.`;
 
   const canales=[
-    ['Pago móvil', gS.usd.pm, 0],['Transferencia', gS.usd.tr, 0],['Efectivo', gS.usd.ef, 0],
+    ['Pago móvil', gS.usd.pm, 0],['Transferencia', gS.usd.tr, 0],['Efectivo Bs', gS.usd.efbs, 0],['Efectivo USD', gS.usd.efusd, 0],
     ['Depósito', gS.usd.dep, 0],['Retención', gS.usd.ret, 0],['Débito', gS.usd.td, com.td],
     ['Tarjeta crédito', gS.usd.tc, com.tc],['Biopago', gS.usd.bio, 0.005],['BT Tesoro', gS.usd.bt, com.bt]
   ];
@@ -576,6 +577,16 @@ function num(x){
 function cleanBank(b){
   if(!b || !String(b).trim()) return 'EFECTIVO / SIN BANCO';
   const u = String(b).trim().toUpperCase();
+  const ACC = [ // códigos de CUENTA BANCARIA (tu cuenta receptora)
+    [/BDV/,'Banco de Venezuela'],[/BANESCO/,'Banesco'],[/BFC/,'BFC'],[/BANCA ?AMIGA/,'Banca Amiga'],
+    [/^BNC/,'BNC'],[/BANPLUS/,'Banplus'],[/ACTIVO/,'Banco Activo'],[/TESORO/,'Banco del Tesoro'],
+    [/MERCANTIL/,'Banco Mercantil'],[/PROVINCIAL/,'Provincial'],[/VENEZUELA/,'Banco de Venezuela'],
+    [/CARON/,'Caroní'],[/DELTA/,'Banco Delta'],[/EXTERIOR/,'Banco Exterior'],[/PLAZA/,'Banco Plaza'],
+    [/AGRICOLA/,'Banco Agrícola'],[/BICENTENARIO/,'Banco Bicentenario'],[/FONDO COMUN/,'Fondo Común'],
+    [/DEL ?SUR/,'Banco del Sur'],[/FANB/,'Banfanb'],[/SOFITASA/,'Sofitasa'],[/100%/,'100% Banco'],
+    [/BANCARIBE/,'Bancaribe'],[/NACIONAL/,'Nacional de Crédito'],[/AMIGA/,'Banca Amiga']
+  ];
+  for(const [re,name] of ACC){ if(re.test(u)) return name; }
   const MAP = [
     [/VENEZUELA/,'Banco de Venezuela'],[/BICENTENARIO/,'Banco Bicentenario'],[/TESORO/,'Banco del Tesoro'],
     [/MERCANTIL/,'Banco Mercantil'],[/PROVINCIAL/,'Provincial'],[/CARON/,'Caroní'],[/ACTIVO/,'Banco Activo'],
@@ -612,7 +623,7 @@ async function parseReportExcel(buf){
       fpRows[fp].cant++; fpRows[fp].usd += mf;
     }
     igtf += num(r['IGTF']);
-    const b = cleanBank(r['Banco']);
+    const b = cleanBank(r['Cuenta Bancaria'] || r['Banco']);
     banks[b] = banks[b] || {usd:0, cant:0};
     banks[b].usd += mf; banks[b].cant++;
     if(fp){ bankMat[b] = bankMat[b]||{}; bankMat[b][fp] = (bankMat[b][fp]||0)+mf; }
@@ -702,7 +713,7 @@ function renderBanks(A,S,names){
   const btA=(A.banks&&A.banks['Banco del Tesoro'])? A.banks['Banco del Tesoro'].usd : 0;
   const btS=S.banks['Banco del Tesoro']? S.banks['Banco del Tesoro'].usd : 0;
   document.getElementById('bankNote').innerHTML =
-    `<b>Lectura:</b> ${top1.b} concentra <b>${top1.mix.toFixed(1)}%</b> de la recaudación y el top 3 <b>${(top3/totS*100).toFixed(1)}%</b> — ` +
+    `<b>Lectura:</b> Banco según tu <b>cuenta receptora</b> (columna Cuenta Bancaria). ${top1.b} concentra <b>${top1.mix.toFixed(1)}%</b> de la recaudación y el top 3 <b>${(top3/totS*100).toFixed(1)}%</b> — ` +
     `alta concentración: prioridad de negociación de comisiones en ${top1.b}. ` +
     (btS? `Banco del Tesoro (botón + tarjetas) en ${names[1]}: <b>${fmt(btS)}</b> ${btA?`(${chipDelta(btA,btS)})`:''}. `:'') +
     `Las comisiones por banco se configuran en la barra lateral y el costo se recalcula en vivo.`;
